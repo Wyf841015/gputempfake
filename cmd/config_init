@@ -1,0 +1,3 @@
+#!/bin/bash
+# gputempfake: config_init
+exit 0

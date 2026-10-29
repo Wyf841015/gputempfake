@@ -1,0 +1,3 @@
+#!/bin/bash
+# gputempfake: install_init
+exit 0

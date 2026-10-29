@@ -1,0 +1,9 @@
+#!/bin/bash
+# 安装后：只准备目录和日志，不自动接管（接管是用户显式点击的动作）
+set -u
+VAR="${TRIM_PKGVAR:?TRIM_PKGVAR 为空}"
+mkdir -p "$VAR"/{lib,fakehwmon,log}
+chmod 700 "$VAR"
+chmod 755 "$VAR"/fakehwmon
+echo "[$(date '+%F %T')] installed ${TRIM_APPVER} runner=$(id -un) appdest=${TRIM_APPDEST}" >> "$VAR/log/app.log"
+exit 0

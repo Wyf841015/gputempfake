@@ -1,0 +1,3 @@
+#!/bin/bash
+# gputempfake: upgrade_init
+exit 0

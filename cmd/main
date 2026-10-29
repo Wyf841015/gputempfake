@@ -1,0 +1,8 @@
+#!/bin/bash
+# GPU 温度接管：CGI 应用，无常驻进程，所有操作由 index.cgi 按请求执行
+case "$1" in
+start)  exit 0 ;;
+stop)   exit 0 ;;
+status) exit 0 ;;
+*)      exit 1 ;;
+esac

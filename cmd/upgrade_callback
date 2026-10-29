@@ -1,0 +1,21 @@
+#!/bin/bash
+# 升级后：如果当前处于「已接管」状态，换上本版本的新库并重启 resmon（保持接管不中断）
+set -u
+VAR="${TRIM_PKGVAR:?}"
+DROPIN=/etc/systemd/system/resmon_service.service.d/zz-gputempfake.conf
+echo "[$(date '+%F %T')] upgrade ${TRIM_OLD_APPVER:-?} -> ${TRIM_APPVER}" >> "$VAR/log/app.log"
+if [ -f "$DROPIN" ]; then
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)  SRC="$TRIM_APPDEST/ui/bin/libgputempfake-x86_64.so" ;;
+        aarch64) SRC="$TRIM_APPDEST/ui/bin/libgputempfake-aarch64.so" ;;
+        *)       echo "  不支持的架构 $ARCH，保持原库" >> "$VAR/log/app.log"; exit 0 ;;
+    esac
+    if [ -f "$SRC" ]; then
+        install -m 755 -o root -g root "$SRC" "$VAR/lib/libgputempfake.so" \
+            && echo "  库已更新" >> "$VAR/log/app.log"
+        systemctl daemon-reload
+        systemctl restart resmon_service
+    fi
+fi
+exit 0

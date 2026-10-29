@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU 温度接管</title>
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🌡️</span>
+    <div class="brand-text">
+      <h1>GPU 温度接管</h1>
+      <p>为没有 GPU 温度传感器的机型补一个读数</p>
+    </div>
+    <span class="ver" id="version">v —</span>
+  </div>
+  <button class="icon-btn" id="themeBtn" type="button" title="切换主题">☾</button>
+</header>
+
+<main class="wrap">
+
+  <!-- 状态卡片 -->
+  <section class="card hero" id="heroCard">
+    <div class="hero-left">
+      <div class="state-badge" id="stateBadge">读取中…</div>
+      <h2 id="stateTitle">正在检测本机情况</h2>
+      <p class="muted" id="stateReason">请稍候…</p>
+    </div>
+    <div class="hero-right">
+      <div class="gauge">
+        <div class="gauge-label">资源监控显示的<br>GPU 温度</div>
+        <div class="gauge-value"><span id="fakeTemp">—</span><small id="fakeUnit"></small></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label">CPU 真实温度</div>
+        <div class="gauge-value"><span id="cpuTemp">—</span><small>°C</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 操作 -->
+  <section class="card actions">
+    <div class="action-text">
+      <h3>接管控制</h3>
+      <p class="muted" id="actionHint">接管会把注入配置写进 resmon_service，立刻生效；还原会删干净并重启该服务。</p>
+    </div>
+    <div class="action-btns">
+      <button class="btn btn-primary" id="installBtn" type="button">一键接管</button>
+      <button class="btn btn-danger" id="uninstallBtn" type="button">一键还原</button>
+    </div>
+  </section>
+
+  <!-- 明细 -->
+  <section class="card">
+    <h3>本机检测结果</h3>
+    <table class="kv">
+      <tbody>
+        <tr><th>GPU 设备</th><td id="kGpu">—</td></tr>
+        <tr><th>真实 GPU 温度传感器</th><td id="kSensors">—</td></tr>
+        <tr><th>CPU 温度来源</th><td id="kCpuSrc">—</td></tr>
+        <tr><th>resmon_service</th><td id="kService">—</td></tr>
+        <tr><th>拦截库是否已加载</th><td id="kLoaded">—</td></tr>
+        <tr><th>注入配置</th><td id="kDropin">—</td></tr>
+        <tr><th>拦截库文件</th><td id="kLib">—</td></tr>
+        <tr><th>假温度文件</th><td id="kFake">—</td></tr>
+        <tr><th>运行环境</th><td id="kEnv">—</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 原理 -->
+  <section class="card">
+    <h3>它做了什么（以及没做什么）</h3>
+    <ul class="notes">
+      <li><b>只补温度。</b>通过 <code>LD_PRELOAD</code> 让 <code>resmon_service</code> 的传感器探测拿到一个替代文件，内容就是 CPU 温度。磁盘温度、CPU 温度、GPU 占用率都不受影响。</li>
+      <li><b>显示的不是真实 GPU 温度。</b>是 CPU 温度顶替。GPU 满载时 CPU 未必同步升温，只能当「有没有过热」的参考。</li>
+      <li><b>失败不会拖垮资源监控。</b>拦截库缺失或被删时，系统只会打一行 warning 并继续启动，等于回到「没有 GPU 温度」的原始状态。</li>
+      <li><b>真实的 GPU 传感器优先。</b>本机若本来就有 GPU 温度节点，界面会判定「不适用」并禁用接管 —— 那种情况下接管只会把真值盖掉。</li>
+      <li><b>卸载自动清理。</b>卸载应用会删除注入配置并重启 <code>resmon_service</code>，系统恢复原样。</li>
+    </ul>
+  </section>
+
+  <!-- 日志 -->
+  <section class="card">
+    <div class="log-head">
+      <h3>运行日志</h3>
+      <button class="btn btn-ghost btn-sm" id="logBtn" type="button">刷新日志</button>
+    </div>
+    <pre class="log" id="logBox">（点「刷新日志」查看）</pre>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="static/app.js"></script>
+</body>
+</html>

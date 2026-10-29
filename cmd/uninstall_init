@@ -1,0 +1,3 @@
+#!/bin/bash
+# gputempfake: uninstall_init
+exit 0

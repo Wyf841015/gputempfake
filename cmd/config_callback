@@ -1,0 +1,3 @@
+#!/bin/bash
+# gputempfake: config_callback
+exit 0

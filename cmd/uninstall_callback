@@ -1,0 +1,17 @@
+#!/bin/bash
+# 卸载后：把注入彻底撤掉，恢复系统原样（drop-in 必须删，否则 resmon 一直带着 LD_PRELOAD）
+set -u
+VAR="${TRIM_PKGVAR:-/vol3/@appdata/gputempfake}"
+DROPIN=/etc/systemd/system/resmon_service.service.d/zz-gputempfake.conf
+mkdir -p "$VAR/log" 2>/dev/null
+{
+    echo "[$(date '+%F %T')] uninstall ${TRIM_APPVER:-?}"
+} >> "$VAR/log/app.log" 2>/dev/null
+if [ -f "$DROPIN" ]; then
+    rm -f "$DROPIN"
+    systemctl daemon-reload
+    systemctl restart resmon_service
+    echo "  已移除 drop-in 并重启 resmon_service" >> "$VAR/log/app.log" 2>/dev/null
+fi
+rm -rf "$VAR/lib" "$VAR/fakehwmon"
+exit 0
