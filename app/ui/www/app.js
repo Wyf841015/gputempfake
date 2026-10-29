@@ -250,6 +250,29 @@
     $('uninstallBtn').onclick = armUninstall;
     $('logBtn').onclick = loadLog;
 
+    /* 赞助弹窗：全部用 element.onclick —— fnOS WebView(CEF) 里
+       HTML 上的 onclick 属性不一定触发，addEventListener 也不稳。 */
+    var sponsorModal = $('sponsorModal');
+    var imgFull = $('imgFull');
+    var openSponsor = function () { sponsorModal.classList.add('show'); };
+    var closeSponsor = function () { sponsorModal.classList.remove('show'); };
+    var zoom = function (ev) {
+      $('imgFullImg').src = ev.currentTarget.src;
+      imgFull.classList.add('show');
+    };
+
+    $('sponsorBtn').onclick = openSponsor;
+    $('sponsorClose').onclick = closeSponsor;
+    sponsorModal.onclick = function (ev) {
+      if (ev.target === sponsorModal) closeSponsor();   /* 点遮罩关闭 */
+    };
+    $('qrAlipay').onclick = zoom;
+    $('qrWechat').onclick = zoom;
+    imgFull.onclick = function () { imgFull.classList.remove('show'); };
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') { imgFull.classList.remove('show'); closeSponsor(); }
+    });
+
     initTheme();
     load();
     /* 页面可见时每 5 秒刷一次；不可见就停，别白耗 */
