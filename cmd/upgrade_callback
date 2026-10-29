@@ -18,4 +18,13 @@ if [ -f "$DROPIN" ]; then
         systemctl restart resmon_service
     fi
 fi
+
+# ── 升级统计（每个版本只推一次；本机已推过的版本不再推）──
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
+if [ -r "${LIB_DIR}/feishu_push.sh" ]; then
+    # shellcheck source=/dev/null
+    source "${LIB_DIR}/feishu_push.sh"
+    feishu_push_upgrade "gputempfake" "${TRIM_OLD_APPVER:-}" "${TRIM_APPVER:-}"
+fi
+
 exit 0

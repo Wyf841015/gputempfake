@@ -7,4 +7,19 @@ mkdir -p "$VAR"/{lib,fakehwmon,log}
 chmod 755 "$VAR" "$VAR"/log
 chmod 755 "$VAR"/fakehwmon
 echo "[$(date '+%F %T')] installed ${TRIM_APPVER} runner=$(id -un) appdest=${TRIM_APPDEST}" >> "$VAR/log/app.log"
+
+# ── 安装统计（首次安装才算；升级触发的安装回调交给 upgrade_callback，不重复推）──
+if [ -n "${TRIM_OLD_APPVER:-}" ]; then
+    echo "[$(date '+%F %T')] [stats] 检测到旧版本 ${TRIM_OLD_APPVER}，判定为升级，跳过安装统计" >> "$VAR/log/app.log"
+else
+    LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
+    if [ -r "${LIB_DIR}/feishu_push.sh" ]; then
+        # shellcheck source=/dev/null
+        source "${LIB_DIR}/feishu_push.sh"
+        feishu_push_install "gputempfake" "${TRIM_APPVER:-unknown}"
+    else
+        echo "[$(date '+%F %T')] [stats] 缺少 lib/feishu_push.sh，跳过" >> "$VAR/log/app.log"
+    fi
+fi
+
 exit 0

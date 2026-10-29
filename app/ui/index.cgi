@@ -31,7 +31,7 @@ DROPIN=/etc/systemd/system/resmon_service.service.d/zz-gputempfake.conf
 REQ="$VAR/req"
 RES="$VAR/res"
 WWW="$APPDEST/ui/www"
-VERSION="0.1.2"
+VERSION="0.1.0"
 
 mkdir -p "$LOGDIR" "$REQ" "$RES" 2>/dev/null
 
