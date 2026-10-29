@@ -1,5 +1,7 @@
 # GPU 温度接管（GPUTempFake）
 
+> 当前版本：**v0.1.0**（首发版本）· 平台：fnOS（x86_64 / aarch64）· 许可证：MIT
+
 给**内核层就没有 GPU 温度传感器**的机型补一个读数，让 fnOS「资源监控」里的「GPU 温度」不再空白。
 
 > 典型机型：Intel Celeron J3355（Apollo Lake）这类 i915 核显。
@@ -102,6 +104,10 @@ bash src/build-shim.sh      # 编 x86_64 + aarch64 拦截库
 python3 src/make-icons.py   # 重新生成图标
 fnpack build .              # 产物 gputempfake.fpk（manifest 所在目录执行）
 ```
+
+## 许可证
+
+MIT License，见 [LICENSE](LICENSE)。
 
 ## 版本历史
 
