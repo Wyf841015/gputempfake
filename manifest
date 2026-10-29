@@ -1,5 +1,5 @@
 appname               = gputempfake
-version               = 0.1.1
+version               = 0.1.2
 display_name          = GPU 温度接管
 desc                  = 为不提供 GPU 温度传感器的机型接管接口，用 CPU 温度顶替，让 fnOS 资源监控里的 GPU 温度不再空白
 platform              = all

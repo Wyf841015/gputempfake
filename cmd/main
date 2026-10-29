@@ -1,8 +1,47 @@
 #!/bin/bash
-# GPU 温度接管：CGI 应用，无常驻进程，所有操作由 index.cgi 按请求执行
+# GPUTempFake：前台是 CGI，后台有一个 root 助手（rootd.sh）负责执行系统级动作。
+# 应用 config/privilege 是 run-as=root，所以这里拉起的 rootd 也是 root。
+set -u
+APPDEST="${TRIM_APPDEST:-/var/apps/gputempfake/target}"
+VAR="${TRIM_PKGVAR:-/vol3/@appdata/gputempfake}"
+LOGDIR="$VAR/log"
+PIDF="$LOGDIR/rootd.pid"
+
+running() {
+    [ -s "$PIDF" ] || return 1
+    local p
+    p=$(tr -dc '0-9' < "$PIDF" 2>/dev/null)
+    [ -n "$p" ] || return 1
+    [ -r "/proc/$p/cmdline" ] || return 1
+    tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -q rootd.sh
+}
+
 case "$1" in
-start)  exit 0 ;;
-stop)   exit 0 ;;
-status) exit 0 ;;
-*)      exit 1 ;;
+start)
+    running && exit 0
+    mkdir -p "$LOGDIR" 2>/dev/null
+    nohup bash "$APPDEST/ui/rootd.sh" >> "$LOGDIR/rootd.out" 2>&1 &
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 0.3
+        running && exit 0
+    done
+    echo "rootd 启动失败，详见 $LOGDIR/rootd.out" > "${TRIM_TEMP_LOGFILE:-/dev/null}" 2>/dev/null
+    exit 1
+    ;;
+stop)
+    if running; then
+        p=$(tr -dc '0-9' < "$PIDF" 2>/dev/null)
+        kill -TERM "$p" 2>/dev/null
+        sleep 0.5
+        rm -f "$PIDF" 2>/dev/null
+    fi
+    exit 0
+    ;;
+status)
+    running && exit 0
+    exit 3
+    ;;
+*)
+    exit 1
+    ;;
 esac

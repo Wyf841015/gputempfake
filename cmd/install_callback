@@ -3,7 +3,8 @@
 set -u
 VAR="${TRIM_PKGVAR:?TRIM_PKGVAR 为空}"
 mkdir -p "$VAR"/{lib,fakehwmon,log}
-chmod 700 "$VAR"
+# VAR 与 log 必须可读可进：CGI 可能以非 root 运行，要读 token、写 req/
+chmod 755 "$VAR" "$VAR"/log
 chmod 755 "$VAR"/fakehwmon
 echo "[$(date '+%F %T')] installed ${TRIM_APPVER} runner=$(id -un) appdest=${TRIM_APPDEST}" >> "$VAR/log/app.log"
 exit 0

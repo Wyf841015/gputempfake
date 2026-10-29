@@ -11,6 +11,7 @@
   var uninstallArmed = false;
   var armTimer = null;
   var busy = false;
+  var TOKEN = '';
 
   /* ── 主题 ── */
   function applyTheme(t) {
@@ -60,6 +61,7 @@
   /* ── 渲染状态 ── */
   function render(d) {
     $('version').textContent = 'v' + d.version;
+    TOKEN = d.token || TOKEN;
 
     var badge = $('stateBadge');
     var title = $('stateTitle');
@@ -127,12 +129,14 @@
       ? pill(fmtTemp(d.installed.fake_celsius) + '°C', 'ok') + ' <code>' + esc(d.installed.fake_path) + '</code>'
       : '<span class="muted">不存在</span>';
     $('kEnv').innerHTML = pill(esc(d.arch)) + ' ' + pill(esc(d.kernel)) + ' ' +
-      pill('uid ' + d.uid + ' · ' + esc(d.running_as), d.is_root ? 'ok' : 'bad');
+      pill('uid ' + d.uid + ' · ' + esc(d.running_as), d.is_root ? 'ok' : '') + ' ' +
+      pill('后台助手 ' + (d.rootd_running ? '运行中' : '未运行'), d.rootd_running ? 'ok' : (d.is_root ? '' : 'bad'));
 
     /* 按钮可用性 */
     var ib = $('installBtn'), ub = $('uninstallBtn');
-    ib.disabled = busy || !d.applicable || !d.is_root || d.state === 'installed';
-    ub.disabled = busy || !d.is_root || (d.state === 'not_installed' && !d.installed.lib_exists);
+    var canRun = d.is_root || d.rootd_running;   // CGI 是 root，或 root 助手在跑
+    ib.disabled = busy || !d.applicable || !canRun || d.state === 'installed';
+    ub.disabled = busy || !canRun || (d.state === 'not_installed' && !d.installed.lib_exists);
     if (!d.applicable) {
       ib.title = d.reason || '';
     } else if (d.state === 'installed') {
@@ -142,8 +146,8 @@
       ib.title = '';
       ib.textContent = '一键接管';
     }
-    if (!d.is_root) {
-      ib.title = ub.title = '当前 CGI 不是以 root 运行（uid ' + d.uid + '），无法写入系统目录';
+    if (!canRun) {
+      ib.title = ub.title = '当前 CGI 不是 root（uid ' + d.uid + '）且后台助手没运行，无法写入系统目录；请到应用中心重启本应用';
     }
   }
 
@@ -170,7 +174,7 @@
     if (busy) return;
     setBusy(true);
     toast('正在接管…', '');
-    api('api/install', {
+    api('api/install?t=' + encodeURIComponent(TOKEN), {
       method: 'POST',
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
     }).then(function (r) {
@@ -188,6 +192,7 @@
       uninstallArmed = true;
       b.classList.add('arming');
       b.textContent = '确认还原？再点一次';
+      toast('再点一次按钮确认还原（6 秒内有效）', '');
       clearTimeout(armTimer);
       armTimer = setTimeout(function () {
         uninstallArmed = false;
@@ -202,7 +207,7 @@
     b.textContent = '一键还原';
     setBusy(true);
     toast('正在还原…', '');
-    api('api/uninstall', {
+    api('api/uninstall?t=' + encodeURIComponent(TOKEN), {
       method: 'POST',
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
     }).then(function (r) {
