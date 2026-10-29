@@ -6,33 +6,38 @@
 ###   feishu_push_install "gputempfake" "${TRIM_APPVER}"
 ###   feishu_push_upgrade "gputempfake" "${TRIM_OLD_APPVER}" "${TRIM_APPVER}"
 ###
-### 本机不重复推送（核心）：
-###   设备 UUID 取 /etc/machine-id（同一台机器永远相同），
-###   已推送事件记在 /var/cache/.gputempfake_stats/pushed 里：
-###     install              首次安装，本机只推一次，永不重复
-###     upgrade:<版本号>      某个版本只推一次
-###   所以重装、回调被重复执行、同版本反复安装，都不会重复入库。
-###   推送失败不记账，下次还能重试。
+### 推送策略（两种机器行为不同）：
+###   · 普通机器：**每次安装、每次升级都推送一条**（不去重）
+###   · 开发机：同一事件只推一次，避免开发阶段反复装卸把表格刷满
+###     开发机由标记文件识别（打包时不带任何机器标识）：
+###       /etc/gputempfake-dev-mode
+###       /var/cache/.gputempfake_stats/dev-dedupe
+###      环境变量 GPUTEMPFAKE_DEV_DEDUPE=1 也可以强制打开
+###     开发机账本 /var/cache/.gputempfake_stats/pushed 记：install / upgrade:<版本号>
+###   · 推送失败不记账，下次还能重试
 ###
 ### 开关（调试用）：
 ###   FEISHU_PUSH_DRY=1        只打印不联网
 ###   FEISHU_PUSH_SYNC=1       前台同步执行（默认走后台，不拖慢安装）
 ###   GPUTEMPFAKE_STATS_DIR=…  改状态目录（测试用，默认 /var/cache/.gputempfake_stats）
+###   GPUTEMPFAKE_DEV_DEDUPE=1 强制按开发机去重
 
 FEISHU_APP_ID="cli_aa9c4a61e8789bc9"
 FEISHU_APP_SECRET="1JjTelglJK23XY2KXCiztge5TKBMQISg"
 FEISHU_APP_TOKEN="JXxibJOYcaC7ZFsuKmecTwibnjf"
 FEISHU_TABLE_ID="tbl1kmuwQu2CToeN"
 
-_FS_STATE_DIR="${GPUTEMPFAKE_STATS_DIR:-/var/cache/.gputempfake_stats}"
-_FS_LEDGER="${_FS_STATE_DIR}/pushed"
-_FS_UUID_FILE="${_FS_STATE_DIR}/device-uuid"
-_FS_LOG_DIR="${TRIM_PKGVAR:-}/log"
+# 路径延迟解析：每个函数调用时再取，改 GPUTEMPFAKE_STATS_DIR 立即生效（也方便测试）
+_fs_state_dir() { printf '%s' "${GPUTEMPFAKE_STATS_DIR:-/var/cache/.gputempfake_stats}"; }
+_fs_ledger()    { printf '%s/pushed' "$(_fs_state_dir)"; }
+_fs_uuid_file() { printf '%s/device-uuid' "$(_fs_state_dir)"; }
+_fs_log_dir()   { printf '%s/log' "${TRIM_PKGVAR:-}"; }
 
 _fs_log() {
     local line="[$(_fs_now)] $*"
-    if [ -n "${_FS_LOG_DIR:-}" ] && [ -d "${_FS_LOG_DIR}" ]; then
-        printf '%s\n' "${line}" >> "${_FS_LOG_DIR}/app.log" 2>/dev/null
+    local d; d=$(_fs_log_dir)
+    if [ -n "${TRIM_PKGVAR:-}" ] && [ -d "${d}" ]; then
+        printf '%s\n' "${line}" >> "${d}/app.log" 2>/dev/null
     fi
     printf '%s\n' "${line}" >&2
 }
@@ -52,13 +57,14 @@ _fs_device_uuid() {
     fi
 
     if [ -z "${raw}" ] || [ "${#raw}" -lt 16 ]; then
-        mkdir -p "${_FS_STATE_DIR}" 2>/dev/null
-        if [ -f "${_FS_UUID_FILE}" ]; then
-            raw=$(tr -d '[:space:]' < "${_FS_UUID_FILE}" 2>/dev/null)
+        local d uf; d=$(_fs_state_dir); uf=$(_fs_uuid_file)
+        mkdir -p "${d}" 2>/dev/null
+        if [ -f "${uf}" ]; then
+            raw=$(tr -d '[:space:]' < "${uf}" 2>/dev/null)
         else
             raw=$(cat /proc/sys/kernel/random/uuid 2>/dev/null | tr -d '[:space:]-')
-            printf '%s' "${raw}" > "${_FS_UUID_FILE}" 2>/dev/null && \
-                chmod 644 "${_FS_UUID_FILE}" 2>/dev/null
+            printf '%s' "${raw}" > "${uf}" 2>/dev/null && \
+                chmod 644 "${uf}" 2>/dev/null
         fi
     fi
 
@@ -67,25 +73,35 @@ _fs_device_uuid() {
         "${raw:0:8}" "${raw:8:4}" "${raw:12:4}" "${raw:16:4}" "${raw:20:12}"
 }
 
-# ── 去重账本 ─────────────────────────────────────────────────
+# ── 去重账本（仅开发机使用）─────────────────────────────────
+# 普通机器直接返回 1（不去重）→ 每次安装/升级都推一条
+_fs_dev_dedupe() {
+    [ "${GPUTEMPFAKE_DEV_DEDUPE:-0}" = "1" ] && return 0
+    [ -f /etc/gputempfake-dev-mode ] && return 0
+    [ -f "$(_fs_state_dir)/dev-dedupe" ] && return 0
+    return 1
+}
+
 _fs_seen() {
     local key="$1"
-    [ -f "${_FS_LEDGER}" ] || return 1
-    grep -qxF "${key}" "${_FS_LEDGER}" 2>/dev/null
+    local l; l=$(_fs_ledger)
+    [ -f "${l}" ] || return 1
+    grep -qxF "${key}" "${l}" 2>/dev/null
 }
 
 _fs_mark() {
     local key="$1"
-    mkdir -p "${_FS_STATE_DIR}" 2>/dev/null
+    local d l; d=$(_fs_state_dir); l=$(_fs_ledger)
+    mkdir -p "${d}" 2>/dev/null
     if command -v flock >/dev/null 2>&1; then
         # 同一个锁文件串行化，避免 install/upgrade 同时跑时双写
         (
             flock -w 5 9 || exit 0
-            _fs_seen "${key}" || printf '%s\n' "${key}" >> "${_FS_LEDGER}"
-            chmod 644 "${_FS_LEDGER}" 2>/dev/null
-        ) 9>"${_FS_STATE_DIR}/.lock"
+            _fs_seen "${key}" || printf '%s\n' "${key}" >> "${l}"
+            chmod 644 "${l}" 2>/dev/null
+        ) 9>"${d}/.lock"
     else
-        _fs_seen "${key}" || printf '%s\n' "${key}" >> "${_FS_LEDGER}"
+        _fs_seen "${key}" || printf '%s\n' "${key}" >> "${l}"
     fi
 }
 
@@ -120,11 +136,15 @@ _fs_esc() {
 # _fs_push <app> <ver> <oldver> <status> <dedupe-key>
 _fs_push() {
     local app="$1" ver="$2" oldver="$3" status="$4" key="$5"
-    local uuid tok loc payload fields
+    local uuid tok loc payload fields dedupe=0
 
-    if _fs_seen "${key}"; then
-        _fs_log "[stats] ${key} 已推送过，跳过"
-        return 0
+    # 只有开发机做去重；普通机器每次安装/升级都真推
+    if _fs_dev_dedupe; then
+        dedupe=1
+        if _fs_seen "${key}"; then
+            _fs_log "[stats] ${key} 已推送过（开发机去重），跳过"
+            return 0
+        fi
     fi
 
     uuid=$(_fs_device_uuid)
@@ -171,7 +191,7 @@ _fs_push() {
     code=$(printf '%s' "${resp}" | grep -o '"code":[0-9-]*' | head -1 | cut -d: -f2)
 
     if [ "${code}" = "0" ]; then
-        _fs_mark "${key}"
+        [ "${dedupe}" = "1" ] && _fs_mark "${key}"
         _fs_log "[stats] ${key} 推送成功 (${app} ${ver})"
         return 0
     fi
@@ -190,7 +210,7 @@ _fs_spawn() {
     local self="${BASH_SOURCE[0]}"
     setsid bash -c "
         source '${self}' >/dev/null 2>&1
-        _FS_LOG_DIR='${_FS_LOG_DIR}'
+        TRIM_PKGVAR='${TRIM_PKGVAR:-}'
         _fs_push '${app}' '${ver}' '${oldver}' '${status}' '${key}'
     " </dev/null >/dev/null 2>&1 &
 }
