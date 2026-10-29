@@ -69,5 +69,11 @@ while :; do
 
     # 顺手清掉超过 10 分钟的结果文件，别无限堆
     find "$RES" -name '*.json' -mmin +10 -delete 2>/dev/null
+
+    # rootd.log 同样限长：超 256KB 只留最后 200 行
+    if [ -f "$LOGDIR/rootd.log" ] && [ "$(stat -c%s "$LOGDIR/rootd.log" 2>/dev/null || echo 0)" -gt 262144 ]; then
+        tail -n 200 "$LOGDIR/rootd.log" > "$LOGDIR/rootd.log.tmp" 2>/dev/null \
+            && mv -f "$LOGDIR/rootd.log.tmp" "$LOGDIR/rootd.log"
+    fi
     sleep 0.3
 done

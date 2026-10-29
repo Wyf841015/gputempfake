@@ -79,7 +79,19 @@ ensure_token() {
 }
 
 # ───────────────────────── 请求留痕 ─────────────────────────
+# 页面每 5 秒轮询一次 status，不设上限的话这个文件会一直长：
+# 每小时约 720 行（90KB），开着一周就是十几 MB。超过 256KB 只留最后 200 行。
+LOG_MAX_BYTES=262144
+cap_log() {
+    local f=$1 sz
+    [ -f "$f" ] || return 0
+    sz=$(stat -c%s "$f" 2>/dev/null || echo 0)
+    [ "$sz" -gt "$LOG_MAX_BYTES" ] || return 0
+    tail -n 200 "$f" > "$f.tmp" 2>/dev/null && mv -f "$f.tmp" "$f"
+}
+
 log_req() {
+    cap_log "$LOGDIR/requests.log"
     echo "[$(date '+%F %T')] ${REQUEST_METHOD:-GET} ${REL_PATH:-?} uid=$(id -u) user=$(id -un 2>/dev/null) token=$1 xhr=${HTTP_X_REQUESTED_WITH:-none} ref=${HTTP_REFERER:-none}" \
         >> "$LOGDIR/requests.log" 2>/dev/null
 }
