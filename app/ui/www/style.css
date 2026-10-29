@@ -152,9 +152,20 @@ body {
   border: 1px solid var(--line);
   text-align: center;
 }
-.gauge-label { font-size: 11px; color: var(--text-dim); line-height: 1.35; }
+.gauge-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.35;
+  /* 两个块的标签一个是两行、一个是一行，不固定高度数字就会错位、下方留白不均 */
+  min-height: 2.7em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
 .gauge-value {
-  margin-top: 4px;
+  margin-top: 2px;
+  line-height: 1.15;
   font-size: 26px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -212,7 +223,11 @@ body {
 .btn-sm { padding: 5px 12px; font-size: 12px; }
 
 /* ── 明细表 ── */
-table.kv { width: 100%; border-collapse: collapse; }
+/* table-layout: fixed 是必需的：不放它，单元格里的 nowrap 长路径会把整张表撑宽，
+   页面横向溢出（实测 436px > 390px 视口），滚动条反而出现在整页上 */
+table.kv { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.kv td { overflow: hidden; }
+table.kv .pill { word-break: break-word; }
 table.kv th, table.kv td {
   text-align: left;
   padding: 8px 10px;
@@ -222,7 +237,27 @@ table.kv th, table.kv td {
 }
 table.kv tr:last-child th, table.kv tr:last-child td { border-bottom: 0; }
 table.kv th { width: 190px; color: var(--text-dim); font-weight: 500; }
-table.kv td { word-break: break-all; }
+table.kv td { overflow-wrap: anywhere; }
+/* 长路径只在自己那一行断，不要连带把标签/服务名也截断 */
+table.kv td code {
+  /* 路径太长，硬断会出现 resmon_se / rvice 这种拦腰截断。
+     改成单行 + 横向滑动：既能完整显示，也不破坏可读性。 */
+  display: block;
+  margin-top: 4px;
+  padding: 3px 7px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+/* 内容超出时右侧渐隐，提示可以横向滑动 */
+table.kv td code.trunc {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+}
+table.kv td code::-webkit-scrollbar { height: 4px; }
+table.kv td code::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 .pill {
   display: inline-block;
   padding: 1px 8px;
@@ -234,6 +269,7 @@ table.kv td { word-break: break-all; }
 .pill.ok   { color: var(--ok);     border-color: rgba(52,211,153,.4); }
 .pill.bad  { color: var(--danger); border-color: rgba(240,97,109,.4); }
 .pill.warn { color: var(--warn);   border-color: rgba(245,185,66,.4); }
+.kv .sub { display: block; margin-top: 4px; font-size: 12px; }
 
 /* ── 说明与日志 ── */
 ul.notes { margin: 0; padding-left: 18px; }
@@ -293,9 +329,13 @@ code {
   .brand-text p { display: none; }
   .wrap { padding: 14px 12px 40px; gap: 12px; }
   .card { padding: 15px; }
-  .hero { flex-direction: column; gap: 14px; }
-  .hero-right { width: 100%; }
-  .gauge { flex: 1 1 0; min-width: 0; }
+  .hero { flex-direction: column; gap: 12px; }
+  /* 桌面端 .hero-left 是 flex: 1 1 300px（横向时的宽度基准）；
+     纵向排列后这个 300px 会变成"高度基准"，把温度块一路推到卡片底部、
+     中间空出一大块。这里必须显式收回。 */
+  .hero-left { flex: 0 1 auto; min-width: 0; }
+  .hero-right { width: 100%; gap: 10px; }
+  .gauge { flex: 1 1 0; min-width: 0; padding: 9px 10px; }
   .gauge-value { font-size: 23px; }
   .actions { flex-direction: column; align-items: stretch; }
   .action-btns { width: 100%; }

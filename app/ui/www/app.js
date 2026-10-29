@@ -111,12 +111,12 @@
       : '<span class="muted">无（正是接管能派上用场的原因）</span>';
 
     $('kCpuSrc').innerHTML = d.cpu_temp
-      ? pill(esc(d.cpu_temp.source), 'ok') + ' ' + fmtTemp(d.cpu_temp.celsius) + '°C'
+      ? pill(fmtTemp(d.cpu_temp.celsius) + '°C', 'ok') + '<code>' + esc(d.cpu_temp.source) + '</code>'
       : pill('读不到', 'bad');
 
     var svcKind = d.service.active === 'active' ? 'ok' : 'bad';
     $('kService').innerHTML = pill(esc(d.service.name) + ' · ' + esc(d.service.active), svcKind) +
-      ' <span class="muted">pid ' + d.service.pid + '</span>';
+      '<span class="sub muted">pid ' + d.service.pid + '</span>';
 
     $('kLoaded').innerHTML = d.service.lib_loaded ? pill('已加载', 'ok') : pill('未加载', '');
     $('kDropin').innerHTML = d.installed.dropin_exists
@@ -148,6 +148,18 @@
     }
     if (!canRun) {
       ib.title = ub.title = '当前 CGI 不是 root（uid ' + d.uid + '）且后台助手没运行，无法写入系统目录；请到应用中心重启本应用';
+    }
+
+    markScrollables();
+  }
+
+  /* 路径是单行 + 横向滑动；超出的那几条加渐隐，否则用户以为被裁掉了 */
+  function markScrollables() {
+    var list = document.querySelectorAll('table.kv td code');
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i];
+      if (el.scrollWidth > el.clientWidth + 1) el.classList.add('trunc');
+      else el.classList.remove('trunc');
     }
   }
 
